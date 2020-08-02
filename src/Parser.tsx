@@ -36,20 +36,52 @@ interface MMLNode {
 }
 
 class Note implements MMLNode {
-  noteValue: string;
-  octaveValue: number;
+  noteValue: number;
   noteLength: number;
-  constructor(note: string, octave: number, length: number) {
+  dotted: boolean;
+  constructor(note: number, length: number, dotted: boolean) {
     this.noteValue = note;
-    this.octaveValue = octave;
     this.noteLength = length;
+    this.dotted = dotted;
   }
   getType() {
     return MMLType.NOTE;
   }
 }
 
-const placeholderNote = new Note("A", 8, 1);
+function letterToMidi(note: Tokens.NoteType, octave: number): number {
+  let noteNumber;
+  switch(note) {
+    case Tokens.NoteType.C:
+      noteNumber = 0;
+      break;
+    case Tokens.NoteType.D:
+      noteNumber = 2;
+      break;
+    case Tokens.NoteType.E:
+      noteNumber = 4;
+      break;
+    case Tokens.NoteType.F:
+      noteNumber = 5;
+      break;
+    case Tokens.NoteType.G:
+      noteNumber = 7;
+      break;
+    case Tokens.NoteType.A:
+      noteNumber = 9;
+      break;
+    case Tokens.NoteType.B:
+      noteNumber = 11;
+      break;
+    default:
+      throw `Invalid Note: ${ note }`;
+      break;
+  }
+
+  return noteNumber + (octave * 12);
+}
+
+const placeholderNote = new Note(72, 1, false);
 
 class Tempo implements MMLNode {
   tempoValue: number;
@@ -71,104 +103,211 @@ class Volume implements MMLNode {
   }
 }
 
+function printNode(node: MMLNode) {
+  switch(node.getType()) {
+    case MMLType.NOTE:
+      let noteNode = node as Note;
+      if(noteNode.noteValue === -1) {
+        return `(Rest ${ noteNode.noteLength }${ noteNode.dotted ? " DOT" : "" })`
+      } else {
+        return `(Note ${ noteNode.noteValue } ${ noteNode.noteLength }${ noteNode.dotted ? " DOT" : "" })`;
+      }
+      break;
+    case MMLType.TEMPO:
+      let tempoNode = node as Tempo;
+      return `(Tempo ${ tempoNode.tempoValue })`;
+      break;
+    case MMLType.VOLUME:
+      let volumeNode = node as Volume;
+      return `(Volume ${ volumeNode.volumeValue })`;
+      break;
+    default:
+      return "Not a node???";
+      break;
+  }
+}
+
+function printNodes(nodes: Array<MMLNode>) {
+  return nodes.map(node => printNode(node)).join();
+}
+
 class MMLState {
   defaultLength: number;
   defaultOctave: number;
+  defaultDotted: boolean;
   constructor(length: number, octave: number) {
     this.defaultLength = length;
     this.defaultOctave = octave;
+    this.defaultDotted = false;
   }
 }
 
-function sharpify(note: Note) {
-  return note;
-}
-
-function flatify(note: Note) {
-  return note;
-}
-
-function parseExtras(tokens: Array<Tokens.MMLToken>, note: Note) {
-  switch(mml.charAt(0)) {
-    case '.':
-      note.noteLength = note.noteLength * 1.5;
-      return note;
-      break;
-    case '+':
-    case '#':
-      return sharpify(note);
-      break;
-    case '-':
-      return flatify(note);
-      break;
-    case '&':
-      return note;
-      break;
-    default:
-      return note;
-      break;
-  }
-}
-
-function parseNote(tokens: Array<Tokens.MMLToken>, state: MMLState): Note {
-  switch(mml.charAt(0).toUpperCase()) {
-    case 'A':
-    case 'B':
-    case 'C':
-    case 'D':
-    case 'E':
-    case 'F':
-    case 'G':
-    case 'R':
-    case 'N':
-  }
-  return placeholderNote;
-}
-
-function parseTempo(tokens: Array<Tokens.MMLToken>, state: MMLState): Tempo {
-  if(mml.charAt(0).toUpperCase() !== 'T') {
-    throw `Unexpected Token: ${ mml.charAt(0) }`;
+function parseNotePitch(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLState): Array<MMLNode> {
+  if(tokens[0] instanceof Tokens.FlatToken) {
+    note.noteValue -= 1;
+    return parseNoteLength(tokens.slice(1), note, state);
+  } else if(tokens[0] instanceof Tokens.SharpToken) {
+    note.noteValue += 1;
+    return parseNoteLength(tokens.slice(1), note, state);
+  } else if(tokens[0] === undefined) {
+    return [note];
   } else {
-    var numberMatch = /\d+/;
-    var tempo = numberMatch.exec(mml);
-    if(tempo === null) {
-      throw "Expected number to follow tempo";
-    }
-    return new Tempo(8);
-    //return parseString(mml.substring(1 + tempo[0].length), state);
+    return parseNoteLength(tokens, note, state);
   }
 }
 
-function parseString(tokens: Array<Tokens.MMLToken>, state: MMLState): Tempo | Note {
-  if(mml.length !== 0 && state !== null) {
-    //alert(mml.charAt(0));
-    switch(mml.charAt(0).toUpperCase()) {
-      case 'A':
-      case 'B':
-      case 'C':
-      case 'D':
-      case 'E':
-      case 'F':
-      case 'G':
-      case 'R':
-      case 'N':
-        //alert("found Note");
-        return parseNote(mml, state);
-        break;
-      case 'T':
-        //alert("Found T");
-        return parseTempo(mml, state);
-        break;
-      case 'L':
-      case 'O':
-      case 'V':
-        break;
-      default:
-        throw `Unexpected Token: ${ mml.charAt(0) }`;
-        break;
-    }
+function parseNoteLength(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLState): Array<MMLNode> {
+  if(tokens[0] instanceof Tokens.NumberToken) {
+    let numberLength = tokens[0] as Tokens.NumberToken;
+    note.noteLength = numberLength.value;
+    return parseDot(tokens.slice(1), note, state);
+  } else if(tokens[0] === undefined) {
+    return [note];
+  } else {
+    return parseDot(tokens, note, state);
   }
-  return new Note("A", 8, 1);
+}
+
+function parseDot(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLState): Array<MMLNode> {
+  console.log(`entered parsedot ${ note.noteValue }`);
+  if(tokens[0] instanceof Tokens.DotToken) {
+    note.dotted = true;
+    //Add tie parsing here later too
+    return [note, ...parseTokens(tokens.slice(1), state)];
+  } else if(tokens[0] === undefined) {
+    return [note];
+  } else {
+    //Add tie parsing here later
+    return [note, ...parseTokens(tokens, state)];
+  }
+}
+
+function parseNote(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.LetterNoteToken || tokens[0] instanceof Tokens.MidiNoteToken)) {
+    throw `Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`;
+  } else if(tokens[0] instanceof Tokens.LetterNoteToken) {
+    let letterValue = tokens[0] as Tokens.LetterNoteToken;
+    let tempNote = new Note(letterToMidi(letterValue.value, state.defaultOctave), state.defaultLength, state.defaultDotted);
+    return parseNotePitch(tokens.slice(1), tempNote, state);
+  } else if(tokens[0] instanceof Tokens.MidiNoteToken) {
+    if(!(tokens[1] instanceof Tokens.NumberToken)) {
+      throw `Expected Number Token: ${ Tokens.printToken(tokens[1]) }`;
+    } else {
+      let midiValue = tokens[1] as Tokens.NumberToken;
+      let tempNote = new Note(midiValue.value, state.defaultLength, state.defaultDotted);
+      return [tempNote, ...parseTokens(tokens.slice(2), state)];
+      //return [...parseNoteLength(tokens, tempNote, state)];
+    }
+  } else {
+    throw `Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`;
+  }
+}
+
+function parseRest(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.RestToken)) {
+    throw `Unexpected Rest Token: ${ Tokens.printToken(tokens[0]) }`;
+  } else {
+    let tempNote = new Note(-1, state.defaultLength, state.defaultDotted);
+    return parseNoteLength(tokens.slice(1), tempNote, state);
+  }
+}
+
+//Expected: T116 or [(Tempo), (Number 116) ...]
+function parseTempo(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.TempoToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
+    throw `Unexpected Tempo Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+  } else {
+    let tempoNumber = tokens[1] as Tokens.NumberToken;
+    return [new Tempo(tempoNumber.value) , ...parseTokens(tokens.slice(2), state)];
+  }
+}
+
+function parseVolume(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.VolumeToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
+    throw `Unexpected Volume Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+  } else {
+    let volumeNumber = tokens[1] as Tokens.NumberToken;
+    return [new Volume(volumeNumber.value) , ...parseTokens(tokens.slice(2), state)];
+  }
+}
+
+function parseLengthDot(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(tokens[0] instanceof Tokens.DotToken) {
+    state.defaultDotted = true;
+    //Add tie parsing here later too
+    return parseTokens(tokens.slice(1), state);
+  } else {
+    return parseTokens(tokens, state);
+  }
+}
+
+function parseLength(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.LengthToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
+    throw `Unexpected Length Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+  } else {
+    let lengthNumber = tokens[1] as Tokens.NumberToken;
+    state.defaultLength = lengthNumber.value;
+    return parseLengthDot(tokens.slice(2), state);
+  }
+}
+
+function parseOctave(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.OctaveToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
+    throw `Unexpected Octave Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+  } else {
+    let lengthNumber = tokens[1] as Tokens.NumberToken;
+    state.defaultOctave = lengthNumber.value;
+    return parseTokens(tokens.slice(2), state);
+  }
+}
+
+function parseOctaveUp(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.OctaveUpToken)) {
+    throw `Unexpected Octave Up Token: ${ Tokens.printToken(tokens[0]) }`;
+  } else {
+    state.defaultOctave += 1;
+    return parseTokens(tokens.slice(1), state);
+  }
+}
+
+function parseOctaveDown(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(!(tokens[0] instanceof Tokens.OctaveDownToken)) {
+    throw `Unexpected Octave Down Token: ${ Tokens.printToken(tokens[0]) }`;
+  } else {
+    state.defaultOctave -= 1;
+    return parseTokens(tokens.slice(1), state);
+  }
+}
+
+function parseTokens(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+  if(tokens.length !== 0 && state !== null) {
+    //alert(mml.charAt(0));
+    if(tokens[0] instanceof Tokens.LetterNoteToken || tokens[0] instanceof Tokens.MidiNoteToken) {
+      return parseNote(tokens, state);
+    } else if(tokens[0] instanceof Tokens.TempoToken) {
+      return parseTempo(tokens, state);
+    } else if(tokens[0] instanceof Tokens.LengthToken) {
+      return parseLength(tokens, state);
+    } else if(tokens[0] instanceof Tokens.OctaveToken) {
+      return parseOctave(tokens, state);
+    } else if(tokens[0] instanceof Tokens.VolumeToken) {
+      return parseVolume(tokens, state);
+    } else if(tokens[0] instanceof Tokens.RestToken) {
+      return parseRest(tokens, state);
+    } else if(tokens[0] instanceof Tokens.OctaveUpToken) {
+      return parseOctaveUp(tokens, state);
+    } else if(tokens[0] instanceof Tokens.OctaveDownToken) {
+      return parseOctaveDown(tokens, state);
+    } else if(tokens[0] instanceof Tokens.TieToken) {
+      return parseTokens(tokens.slice(1), state);
+    } else {
+      console.log(`reached new token ${ Tokens.printTokens(tokens) }`);
+      return [];
+      //throw `Unexpected Token: ${ Tokens.printToken(tokens[0]) }`;
+    }
+  } else {
+    return [];
+  }
 }
 
 function displayContents(contents: any) {
@@ -192,6 +331,7 @@ function Parser() {
   //let testResult = Lexer.lexify("t131ABCDEFG11");
 
   let testResult = Lexer.lexify(TESTMML);
+  let testParsed = parseTokens(testResult, new MMLState(4, 4));
   //alert(testResult);
   //alert(Tokens.printTokens(testResult));
   //alert(Tokens.printToken(testType));
@@ -200,7 +340,8 @@ function Parser() {
     This is a test
     <input onChange={openFile} id="file-input" />
     <div id="file-content"> </div>
-    <div id="parsed-content"> {Tokens.printTokens(testResult)}</div>
+    <div id="debug"> {Tokens.printTokens(testResult)}</div>
+    <div id="parsed-content"> {printNodes(testParsed)}</div>
     {/* <button type="button" id="parse-test" onClick={ () => { displayParsed(parseString(MINIMML, new MMLState(4, 4))) } }> TEST </button> */}
     </div>
 

@@ -115,6 +115,8 @@ export function printToken(token: MMLToken): string {
     return "(Tie)"
   } else if (token instanceof RestToken) {
     return "(Rest)"
+  } else if (token === undefined) {
+    return "EOF"
   } else {
     return "FILLER";
   }
