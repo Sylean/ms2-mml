@@ -330,7 +330,7 @@ function Parser() {
   let testType = new Tokens.LetterNoteToken(Tokens.NoteType.A);
   //let testResult = Lexer.lexify("t131ABCDEFG11");
 
-  let testResult = Lexer.lexify(TESTMML);
+  let testResult = Lexer.lexify(MINIMML);
   let testParsed = parseTokens(testResult, new MMLState(4, 4));
   //alert(testResult);
   //alert(Tokens.printTokens(testResult));
