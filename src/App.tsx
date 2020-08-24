@@ -3,6 +3,7 @@ import logo from './logo.svg';
 import './App.css';
 import Parser from './Parser'
 import Player from './Player';
+import { TRACK1, TRACK2, TRACK3 } from './testmml';
 
 function App() {
   return (
@@ -21,7 +22,9 @@ function App() {
           Learn React
         </a>
         <Parser />
-        <Player text="test"/>
+        <Player text="test" track="1" mml={ TRACK1 }/>
+        <Player text="test" track="2" mml={ TRACK2 }/>
+        <Player text="test" track="3" mml={ TRACK3 }/>
       </header>
     </div>
   );

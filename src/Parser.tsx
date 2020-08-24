@@ -3,10 +3,6 @@ import * as Lexer from './Lexer';
 import * as Tokens from './Tokens';
 import { TESTMML, MINIMML } from './testmml';
 
-function playMusic() {
-  alert("test");
-}
-
 function openFile(e: React.ChangeEvent<HTMLInputElement>) {
   var file:File = e.target.files![0];
   if(!file || e === null) {
@@ -25,17 +21,17 @@ function openFile(e: React.ChangeEvent<HTMLInputElement>) {
   reader.readAsText(file);
 }
 
-enum MMLType {
+export enum MMLType {
   NOTE = "NOTE",
   TEMPO = "TEMPO",
   VOLUME = "VOLUME"
 }
 
-interface MMLNode {
+export interface MMLNode {
   getType(): MMLType;
 }
 
-class Note implements MMLNode {
+export class Note implements MMLNode {
   noteValue: number;
   noteLength: number;
   dotted: boolean;
@@ -74,8 +70,7 @@ function letterToMidi(note: Tokens.NoteType, octave: number): number {
       noteNumber = 11;
       break;
     default:
-      throw `Invalid Note: ${ note }`;
-      break;
+      throw new Error(`Invalid Note: ${ note }`);
   }
 
   return noteNumber + (octave * 12);
@@ -83,7 +78,7 @@ function letterToMidi(note: Tokens.NoteType, octave: number): number {
 
 const placeholderNote = new Note(72, 1, false);
 
-class Tempo implements MMLNode {
+export class Tempo implements MMLNode {
   tempoValue: number;
   constructor(tempo: number) {
     this.tempoValue = tempo;
@@ -93,7 +88,7 @@ class Tempo implements MMLNode {
   }
 }
 
-class Volume implements MMLNode {
+export class Volume implements MMLNode {
   volumeValue: number;
   constructor(volume: number) {
     this.volumeValue = volume;
@@ -103,7 +98,7 @@ class Volume implements MMLNode {
   }
 }
 
-function printNode(node: MMLNode) {
+export function printNode(node: MMLNode) {
   switch(node.getType()) {
     case MMLType.NOTE:
       let noteNode = node as Note;
@@ -112,26 +107,22 @@ function printNode(node: MMLNode) {
       } else {
         return `(Note ${ noteNode.noteValue } ${ noteNode.noteLength }${ noteNode.dotted ? " DOT" : "" })`;
       }
-      break;
     case MMLType.TEMPO:
       let tempoNode = node as Tempo;
       return `(Tempo ${ tempoNode.tempoValue })`;
-      break;
     case MMLType.VOLUME:
       let volumeNode = node as Volume;
       return `(Volume ${ volumeNode.volumeValue })`;
-      break;
     default:
       return "Not a node???";
-      break;
   }
 }
 
-function printNodes(nodes: Array<MMLNode>) {
+export function printNodes(nodes: Array<MMLNode>) {
   return nodes.map(node => printNode(node)).join();
 }
 
-class MMLState {
+export class MMLState {
   defaultLength: number;
   defaultOctave: number;
   defaultDotted: boolean;
@@ -169,7 +160,6 @@ function parseNoteLength(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLS
 }
 
 function parseDot(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLState): Array<MMLNode> {
-  console.log(`entered parsedot ${ note.noteValue }`);
   if(tokens[0] instanceof Tokens.DotToken) {
     note.dotted = true;
     //Add tie parsing here later too
@@ -184,14 +174,14 @@ function parseDot(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLState): 
 
 function parseNote(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.LetterNoteToken || tokens[0] instanceof Tokens.MidiNoteToken)) {
-    throw `Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`;
+    throw new Error(`Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`);
   } else if(tokens[0] instanceof Tokens.LetterNoteToken) {
     let letterValue = tokens[0] as Tokens.LetterNoteToken;
     let tempNote = new Note(letterToMidi(letterValue.value, state.defaultOctave), state.defaultLength, state.defaultDotted);
     return parseNotePitch(tokens.slice(1), tempNote, state);
   } else if(tokens[0] instanceof Tokens.MidiNoteToken) {
     if(!(tokens[1] instanceof Tokens.NumberToken)) {
-      throw `Expected Number Token: ${ Tokens.printToken(tokens[1]) }`;
+      throw new Error(`Expected Number Token: ${ Tokens.printToken(tokens[1]) }`);
     } else {
       let midiValue = tokens[1] as Tokens.NumberToken;
       let tempNote = new Note(midiValue.value, state.defaultLength, state.defaultDotted);
@@ -199,13 +189,13 @@ function parseNote(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNo
       //return [...parseNoteLength(tokens, tempNote, state)];
     }
   } else {
-    throw `Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`;
+    throw new Error(`Unexpected Note Tokens: ${ Tokens.printToken(tokens[0]) }`);
   }
 }
 
 function parseRest(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.RestToken)) {
-    throw `Unexpected Rest Token: ${ Tokens.printToken(tokens[0]) }`;
+    throw new Error(`Unexpected Rest Token: ${ Tokens.printToken(tokens[0]) }`);
   } else {
     let tempNote = new Note(-1, state.defaultLength, state.defaultDotted);
     return parseNoteLength(tokens.slice(1), tempNote, state);
@@ -215,7 +205,7 @@ function parseRest(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNo
 //Expected: T116 or [(Tempo), (Number 116) ...]
 function parseTempo(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.TempoToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
-    throw `Unexpected Tempo Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+    throw new Error(`Unexpected Tempo Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`);
   } else {
     let tempoNumber = tokens[1] as Tokens.NumberToken;
     return [new Tempo(tempoNumber.value) , ...parseTokens(tokens.slice(2), state)];
@@ -224,7 +214,7 @@ function parseTempo(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLN
 
 function parseVolume(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.VolumeToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
-    throw `Unexpected Volume Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+    throw new Error(`Unexpected Volume Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`);
   } else {
     let volumeNumber = tokens[1] as Tokens.NumberToken;
     return [new Volume(volumeNumber.value) , ...parseTokens(tokens.slice(2), state)];
@@ -243,7 +233,7 @@ function parseLengthDot(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<
 
 function parseLength(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.LengthToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
-    throw `Unexpected Length Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+    throw new Error(`Unexpected Length Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`);
   } else {
     let lengthNumber = tokens[1] as Tokens.NumberToken;
     state.defaultLength = lengthNumber.value;
@@ -253,7 +243,7 @@ function parseLength(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MML
 
 function parseOctave(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.OctaveToken) || !(tokens[1] instanceof Tokens.NumberToken)) {
-    throw `Unexpected Octave Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`;
+    throw new Error(`Unexpected Octave Tokens: ${ Tokens.printToken(tokens[0]) } ${ Tokens.printToken(tokens[1]) }`);
   } else {
     let lengthNumber = tokens[1] as Tokens.NumberToken;
     state.defaultOctave = lengthNumber.value;
@@ -263,7 +253,7 @@ function parseOctave(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MML
 
 function parseOctaveUp(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.OctaveUpToken)) {
-    throw `Unexpected Octave Up Token: ${ Tokens.printToken(tokens[0]) }`;
+    throw new Error(`Unexpected Octave Up Token: ${ Tokens.printToken(tokens[0]) }`);
   } else {
     state.defaultOctave += 1;
     return parseTokens(tokens.slice(1), state);
@@ -272,14 +262,14 @@ function parseOctaveUp(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<M
 
 function parseOctaveDown(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(!(tokens[0] instanceof Tokens.OctaveDownToken)) {
-    throw `Unexpected Octave Down Token: ${ Tokens.printToken(tokens[0]) }`;
+    throw new Error(`Unexpected Octave Down Token: ${ Tokens.printToken(tokens[0]) }`);
   } else {
     state.defaultOctave -= 1;
     return parseTokens(tokens.slice(1), state);
   }
 }
 
-function parseTokens(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
+export function parseTokens(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<MMLNode> {
   if(tokens.length !== 0 && state !== null) {
     //alert(mml.charAt(0));
     if(tokens[0] instanceof Tokens.LetterNoteToken || tokens[0] instanceof Tokens.MidiNoteToken) {
