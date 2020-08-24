@@ -9,6 +9,7 @@ function helloTone() {
 
 function Player(props: any) {
 
+//url example: https://sylean.github.io/ms2-mml/3MLE2MS2-soundfonts/acoustic-bass/A0.mp3
 
   return(
     <div>
