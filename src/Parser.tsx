@@ -1,7 +1,7 @@
 import React from 'react';
 import * as Lexer from './Lexer';
 import * as Tokens from './Tokens';
-import { TESTMML, MINIMML } from './testmml';
+import { TRACK1, TRACK2, TRACK3, TESTMML, MINIMML } from './testmml';
 
 function openFile(e: React.ChangeEvent<HTMLInputElement>) {
   var file:File = e.target.files![0];
@@ -151,6 +151,7 @@ function parseNoteLength(tokens: Array<Tokens.MMLToken>, note: Note, state: MMLS
   if(tokens[0] instanceof Tokens.NumberToken) {
     let numberLength = tokens[0] as Tokens.NumberToken;
     note.noteLength = numberLength.value;
+    note.dotted = false;
     return parseDot(tokens.slice(1), note, state);
   } else if(tokens[0] === undefined) {
     return [note];
@@ -227,6 +228,7 @@ function parseLengthDot(tokens: Array<Tokens.MMLToken>, state: MMLState): Array<
     //Add tie parsing here later too
     return parseTokens(tokens.slice(1), state);
   } else {
+    state.defaultDotted = false;
     return parseTokens(tokens, state);
   }
 }
@@ -320,7 +322,7 @@ function Parser() {
   let testType = new Tokens.LetterNoteToken(Tokens.NoteType.A);
   //let testResult = Lexer.lexify("t131ABCDEFG11");
 
-  let testResult = Lexer.lexify(MINIMML);
+  let testResult = Lexer.lexify(TRACK3);
   let testParsed = parseTokens(testResult, new MMLState(4, 4));
   //alert(testResult);
   //alert(Tokens.printTokens(testResult));
